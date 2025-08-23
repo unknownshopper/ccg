@@ -26,27 +26,32 @@
         <div class="container hero">
           <div class="hero-content">
             <h1 class="display">Contacto</h1>
+            <div id="form-status" class="visually-hidden" role="status" aria-live="polite"></div>
             <form action="" class="form-card">
               <label>
-                Nombre
-                <input type="text" name="nombre" placeholder="Tu nombre" required>
+                Nombre <span aria-hidden="true">(requerido)</span>
+                <input id="nombre" type="text" name="nombre" placeholder="Tu nombre" required autocomplete="name" aria-describedby="error-nombre">
+                <small id="error-nombre" class="error-msg" aria-live="polite"></small>
               </label>
               <label>
                 Teléfono
-                <input type="tel" name="telefono" placeholder="Ej: +52 55 1234 5678" autocomplete="tel">
+                <input id="telefono" type="tel" name="telefono" placeholder="Ej: +52 55 1234 5678" autocomplete="tel">
               </label>
               <label class="full">
-                Correo electrónico
-                <input type="email" name="email" placeholder="tu@correo.com" required autocomplete="email">
+                Correo electrónico <span aria-hidden="true">(requerido)</span>
+                <input id="email" type="email" name="email" placeholder="tu@correo.com" required autocomplete="email" aria-describedby="error-email">
+                <small id="error-email" class="error-msg" aria-live="polite"></small>
               </label>
               <label class="full">
-                Mensaje
-                <textarea name="mensaje" placeholder="Cuéntanos sobre tu necesidad" required></textarea>
+                Mensaje <span aria-hidden="true">(requerido)</span>
+                <textarea id="mensaje" name="mensaje" placeholder="Cuéntanos sobre tu necesidad" required aria-describedby="error-mensaje"></textarea>
+                <small id="error-mensaje" class="error-msg" aria-live="polite"></small>
               </label>
-              <label class="full" style="display:flex; gap:8px; align-items:flex-start; font-size:14px; color:#333;">
-                <input type="checkbox" required style="margin-top:3px;">
-                <span>He leído y acepto el <a href="aviso.html">Aviso de Privacidad</a>. Puedo ejercer mis derechos ARCO o solicitar eliminación/envío de información a <a href="mailto:contacto@ccglobal.mx">contacto@ccglobal.mx</a>.</span>
+              <label class="full consent">
+                <input id="consent" type="checkbox" required aria-describedby="error-consent">
+                <span>He leído y acepto el <a href="aviso.html">Aviso de Privacidad</a>. <strong>(requerido)</strong></span>
               </label>
+              <small id="error-consent" class="error-msg" aria-live="polite"></small>
               <div class="actions">
                 <button type="submit">Enviar</button>
               </div>

@@ -7,9 +7,24 @@
       const toggle = document.querySelector('.menu-toggle');
       const nav = document.getElementById('site-nav');
       if (!toggle || !nav) return;
+      const firstNavLink = () => nav.querySelector('a');
+      const closeNav = () => {
+        nav.classList.remove('is-open');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.focus();
+        document.removeEventListener('keydown', onKey);
+      };
+      const openNav = () => {
+        nav.classList.add('is-open');
+        toggle.setAttribute('aria-expanded', 'true');
+        const first = firstNavLink();
+        if (first) first.focus();
+        document.addEventListener('keydown', onKey);
+      };
+      const onKey = (e) => { if (e.key === 'Escape') closeNav(); };
       toggle.addEventListener('click', () => {
-        const open = nav.classList.toggle('is-open');
-        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        const open = nav.classList.contains('is-open');
+        if (open) closeNav(); else openNav();
       });
     })();
 
@@ -110,6 +125,12 @@
           const match = key === 'all' || li.dataset.category === key;
           li.style.display = match ? '' : 'none';
         });
+        // Announce results
+        const status = document.getElementById('results-status');
+        if (status) {
+          const visible = items.filter((li) => li.style.display !== 'none').length;
+          status.textContent = `Mostrando ${visible} resultado${visible === 1 ? '' : 's'}`;
+        }
       };
 
       // Deep-link hash scrolling and highlight for section headings
@@ -276,5 +297,80 @@
       if (panel.hidden) openPanel(); else closePanel();
     });
     close.addEventListener('click', closePanel);
+  })();
+
+  // Contact form: accessible validation and announcements
+  (function contactFormA11y() {
+    if (location.pathname.split('/').pop() !== 'contacto.html') return;
+    const form = document.querySelector('form.form-card');
+    if (!form) return;
+    const status = document.getElementById('form-status');
+    const fields = [
+      { el: document.getElementById('nombre'),   name: 'Nombre',  type: 'text',    err: document.getElementById('error-nombre') },
+      { el: document.getElementById('email'),    name: 'Correo',  type: 'email',   err: document.getElementById('error-email') },
+      { el: document.getElementById('mensaje'),  name: 'Mensaje', type: 'text',    err: document.getElementById('error-mensaje') },
+    ];
+    const consent = document.getElementById('consent');
+    const consentErr = document.getElementById('error-consent');
+
+    const setError = (input, msg, errNode) => {
+      if (!input) return false;
+      input.setAttribute('aria-invalid', 'true');
+      if (errNode) errNode.textContent = msg || '';
+      return true;
+    };
+    const clearError = (input, errNode) => {
+      if (!input) return;
+      input.removeAttribute('aria-invalid');
+      if (errNode) errNode.textContent = '';
+    };
+
+    const validateEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
+
+    fields.forEach(({ el, err }) => {
+      if (!el) return;
+      el.addEventListener('input', () => clearError(el, err));
+      el.addEventListener('blur', () => {
+        if (el.required && !el.value.trim()) setError(el, 'Este campo es requerido.', err);
+        if (el.type === 'email' && el.value && !validateEmail(el.value)) setError(el, 'Ingresa un correo válido.', err);
+      });
+    });
+    if (consent) {
+      consent.addEventListener('change', () => clearError(consent, consentErr));
+    }
+
+    form.addEventListener('submit', (e) => {
+      let firstInvalid = null;
+      // Validate text/email fields
+      fields.forEach(({ el, name, err }) => {
+        if (!el) return;
+        const v = (el.value || '').trim();
+        if (el.required && !v) {
+          if (!firstInvalid) firstInvalid = el;
+          setError(el, `${name} es requerido.`, err);
+        } else if (el.type === 'email' && v && !validateEmail(v)) {
+          if (!firstInvalid) firstInvalid = el;
+          setError(el, 'Ingresa un correo válido.', err);
+        } else {
+          clearError(el, err);
+        }
+      });
+      // Validate consent
+      if (consent && !consent.checked) {
+        if (!firstInvalid) firstInvalid = consent;
+        setError(consent, '', consentErr);
+        if (consentErr) consentErr.textContent = 'Debes aceptar el Aviso de Privacidad.';
+      } else if (consent) {
+        clearError(consent, consentErr);
+      }
+
+      if (firstInvalid) {
+        e.preventDefault();
+        firstInvalid.focus();
+        if (status) status.textContent = 'Hay errores en el formulario. Revisa los campos marcados.';
+      } else {
+        if (status) status.textContent = 'Enviando formulario…';
+      }
+    });
   })();
 })();
