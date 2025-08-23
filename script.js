@@ -118,11 +118,15 @@
         if (!id) return;
         const el = document.getElementById(id);
         if (!el) return;
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        const originalBg = el.style.backgroundColor;
-        el.style.transition = 'background-color 600ms ease';
-        el.style.backgroundColor = 'rgba(255, 122, 0, 0.18)';
-        setTimeout(() => { el.style.backgroundColor = originalBg || ''; }, 1200);
+        const reduce = document.documentElement.classList.contains('a11y-reduce-motion') || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+        // Subtle highlight only if user didn't request reduced motion
+        if (!reduce) {
+          const originalBg = el.style.backgroundColor;
+          el.style.transition = 'background-color 600ms ease';
+          el.style.backgroundColor = 'rgba(255, 122, 0, 0.18)';
+          setTimeout(() => { el.style.backgroundColor = originalBg || ''; }, 1200);
+        }
       };
 
       // Category cards drive filtering
@@ -173,4 +177,104 @@
       });
     }
   });
+
+  // Accessibility preferences panel (site-wide)
+  (function accessibilityPanel() {
+    const root = document.documentElement;
+    const STORAGE_KEY = 'a11y_prefs_v1';
+    const PREFS = {
+      contrast: { className: 'a11y-contrast', label: 'Alto contraste' },
+      reduceMotion: { className: 'a11y-reduce-motion', label: 'Reducir movimiento' },
+      largeText: { className: 'a11y-large-text', label: 'Texto grande' },
+      underlineLinks: { className: 'a11y-underline-links', label: 'Subrayar enlaces' },
+    };
+
+    // Load prefs
+    let state = {};
+    try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; } catch (_) { state = {}; }
+    const apply = () => {
+      Object.entries(PREFS).forEach(([key, def]) => {
+        const on = !!state[key];
+        root.classList.toggle(def.className, on);
+      });
+    };
+    apply();
+
+    // Build UI
+    const btn = document.createElement('button');
+    btn.className = 'a11y-button';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Configuración de accesibilidad');
+    btn.innerHTML = `<img src="accsscc.png" alt="" width="28" height="28" loading="lazy">`;
+
+    const panel = document.createElement('div');
+    panel.className = 'a11y-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'a11y-title');
+    panel.hidden = true;
+
+    const list = document.createElement('div');
+    list.className = 'a11y-options';
+
+    const title = document.createElement('h2');
+    title.id = 'a11y-title';
+    title.textContent = 'Accesibilidad';
+    title.className = 'h2';
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'a11y-close';
+    close.setAttribute('aria-label', 'Cerrar');
+    close.textContent = 'Cerrar';
+
+    panel.appendChild(title);
+
+    const makeRow = (key, def) => {
+      const row = document.createElement('label');
+      row.className = 'a11y-row';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!state[key];
+      cb.addEventListener('change', () => {
+        state[key] = cb.checked;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        apply();
+      });
+      const span = document.createElement('span');
+      span.textContent = def.label;
+      row.appendChild(cb);
+      row.appendChild(span);
+      return row;
+    };
+
+    Object.entries(PREFS).forEach(([key, def]) => list.appendChild(makeRow(key, def)));
+    panel.appendChild(list);
+    panel.appendChild(close);
+
+    document.body.appendChild(btn);
+    document.body.appendChild(panel);
+
+    const openPanel = () => {
+      panel.hidden = false;
+      // focus first checkbox
+      const first = panel.querySelector('input[type="checkbox"]');
+      if (first) first.focus();
+      document.addEventListener('keydown', onKey);
+      document.addEventListener('click', onClickOutside, true);
+    };
+    const closePanel = () => {
+      panel.hidden = true;
+      btn.focus();
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('click', onClickOutside, true);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') closePanel(); };
+    const onClickOutside = (e) => { if (!panel.contains(e.target) && e.target !== btn) closePanel(); };
+
+    btn.addEventListener('click', () => {
+      if (panel.hidden) openPanel(); else closePanel();
+    });
+    close.addEventListener('click', closePanel);
+  })();
 })();
