@@ -14,6 +14,69 @@
       });
     })();
 
+    // Splash screen overlay: show 3s on load and on in-site page navigation (sin doble transición)
+    (function splashOverlay() {
+      const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const DURATION = reduceMotion ? 0 : 2500;
+      let splash, timer;
+
+      function ensureSplash() {
+        if (splash) return splash;
+        splash = document.createElement('div');
+        splash.className = 'splash hidden';
+        splash.innerHTML = '<div class="splash__logo"><img src="logoccg.png" alt="CCGLOBAL"></div>';
+        document.body.appendChild(splash);
+        return splash;
+      }
+
+      function showSplash(duration = DURATION, thenCb) {
+        ensureSplash();
+        splash.classList.remove('hidden');
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          hideSplash();
+          if (typeof thenCb === 'function') thenCb();
+        }, Math.max(0, duration));
+      }
+
+      function hideSplash() {
+        if (!splash) return;
+        splash.classList.add('hidden');
+      }
+
+      // Initial page load splash (skip if we just navigated with pre-navigation splash)
+      // Usamos sessionStorage para evitar doble splash: uno antes de navegar y otro al cargar
+      window.requestAnimationFrame(() => {
+        const suppressOnce = sessionStorage.getItem('suppressSplashOnce') === '1';
+        if (suppressOnce) {
+          sessionStorage.removeItem('suppressSplashOnce');
+          // No mostrar splash al cargar esta página
+          return;
+        }
+        showSplash();
+      });
+
+      // Intercept in-site navigations to other .html pages
+      document.addEventListener('click', (e) => {
+        const a = e.target.closest && e.target.closest('a[href]');
+        if (!a) return;
+        if (a.hasAttribute('download') || a.target === '_blank') return; // let these pass
+        const url = new URL(a.getAttribute('href'), location.href);
+        const isSameOrigin = url.origin === location.origin;
+        const isDifferentPage = url.pathname !== location.pathname;
+        const isHtmlPage = /\.html?$/.test(url.pathname);
+        if (isSameOrigin && isDifferentPage && isHtmlPage) {
+          e.preventDefault();
+          // Marcar para que la página destino NO muestre el splash al cargar (evita doble transición)
+          try { sessionStorage.setItem('suppressSplashOnce', '1'); } catch (_) {}
+          showSplash(DURATION, () => { window.location.href = url.href; });
+        }
+      });
+
+      // Expose for potential debugging
+      window.__splash = { show: showSplash, hide: hideSplash };
+    })();
+
     // Mobile nav toggle
     (function mobileNav() {
       const toggle = document.querySelector('.menu-toggle');

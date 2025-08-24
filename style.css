@@ -44,11 +44,12 @@ a:hover { color: var(--accent); }
 .section2 { padding: 48px 0; }
 .section2 .hero { display: grid; grid-template-columns: 1fr; }
 .section2 .hero-content { padding: 8px 0; }
-.section2 .display { font-size: clamp(1.75rem, 2.5vw + 1rem, 2.25rem); line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 12px; }
-.section2 .lead { font-size: 1.05rem; color: #2a2a2a; margin-top: 12px; }
-.section2 .feature-list { list-style: none; padding: 0; margin: 0 0 4px; display: grid; gap: 8px; }
-.section2 .feature-list li { display: flex; align-items: flex-start; gap: 10px; }
-.section2 .feature-list li::before { content: "✓"; color: var(--accent); font-weight: 700; line-height: 1.4; margin-top: 2px; }
+.display { font-size: clamp(1.75rem, 2.5vw + 1rem, 2.25rem); line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 12px; }
+.lead { font-size: 1.05rem; color: #2a2a2a; margin-top: 12px; }
+.feature-list { list-style: none; padding: 0; margin: 0 0 4px; display: grid; gap: 8px; }
+.feature-list li { display: flex; align-items: flex-start; gap: 10px; }
+.feature-list li::before { content: "✓"; color: var(--accent); font-weight: 700; line-height: 1.4; margin-top: 2px; }
+
 /* Ordered list formatting inside section2 hero */
 .section2 .num-list { 
   margin: 12px 0 0; 
@@ -543,3 +544,26 @@ html.a11y-reduce-motion *::after {
   color: var(--black);
 }
 .nav a[aria-current="page"]:hover { background: var(--gray-200); }
+
+/* Splash screen overlay */
+.splash {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+.splash.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.splash__logo img {
+  width: clamp(120px, 20vw, 220px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.08));
+}
