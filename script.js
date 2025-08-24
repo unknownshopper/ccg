@@ -2,6 +2,18 @@
   document.addEventListener('DOMContentLoaded', function () {
     const path = location.pathname.split('/').pop() || 'index.html';
 
+    // Mark active nav link
+    (function markActiveNav() {
+      const nav = document.getElementById('site-nav');
+      if (!nav) return;
+      const links = Array.from(nav.querySelectorAll('a[href]'));
+      links.forEach((a) => {
+        const href = (a.getAttribute('href') || '').split('/').pop();
+        if (href === path) a.setAttribute('aria-current', 'page');
+        else a.removeAttribute('aria-current');
+      });
+    })();
+
     // Mobile nav toggle
     (function mobileNav() {
       const toggle = document.querySelector('.menu-toggle');
@@ -60,19 +72,10 @@
       });
     };
 
-    // Index: ensure first card routes to RPA anchor
+    // Index: mantener badges sin redirección automática en la primera card
     if (path === 'index.html' || path === '') {
       addBadgesToCards();
       normalizeBadges();
-      const firstCard = document.querySelector('.grid.cols-3 .card');
-      if (firstCard) {
-        firstCard.addEventListener('click', function (e) {
-          const isLink = e.currentTarget.tagName.toLowerCase() === 'a' || e.target.closest('a');
-          if (!isLink) {
-            window.location.href = 'servicios.html#rpa';
-          }
-        });
-      }
     }
 
     // Servicios page enhancements
@@ -248,10 +251,10 @@
       });
 
       // On initial load: if hash is a known category, pre-filter and set card active
-      const validKeys = new Set(['rpa', 'documentos', 'digitalizacion', 'atencion', 'finanzas']);
+      const validKeys = new Set(['all', 'rpa', 'documentos', 'digitalizacion', 'atencion', 'finanzas']);
       const initial = (location.hash || '').replace('#', '');
       if (validKeys.has(initial)) {
-        applyFilter(initial);
+        applyFilter(initial || 'all');
         const initialCard = cards.find((c) => (c.getAttribute('href') || '') === `#${initial}`);
         if (initialCard) initialCard.classList.add('active');
         setTimeout(goToHash, 100);
@@ -261,7 +264,7 @@
       window.addEventListener('hashchange', () => {
         const current = (location.hash || '').replace('#', '');
         if (validKeys.has(current)) {
-          applyFilter(current);
+          applyFilter(current || 'all');
           const currentCard = cards.find((c) => (c.getAttribute('href') || '') === `#${current}`);
           if (currentCard) setActiveCard(currentCard);
         }
