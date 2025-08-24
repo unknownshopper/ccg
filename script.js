@@ -178,7 +178,7 @@
             const alt = title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
             li.innerHTML = `
               <figure class="service-figure">
-                <img class="service-thumb" src="${imgSrc}" alt="${alt}" loading="lazy" width="96" height="96">
+                <img class="service-thumb" src="${imgSrc}" alt="${alt}" loading="lazy" width="96" height="96" onerror="this.onerror=null;this.src='img/shutterstock_316679408-1-e1480607573580.jpg';this.classList.add('thumb-fallback');">
               </figure>
               <div class="service-body">${titleHtml}${descHtml}${metaHtml}</div>
             `;
@@ -277,6 +277,13 @@
       if (!('speechSynthesis' in window)) return; // Graceful degrade
 
       let voices = [];
+      const TTS_PREF_KEY = 'tts_pref_voice';
+      const loadPreferredVoiceName = () => {
+        try { return localStorage.getItem(TTS_PREF_KEY) || ''; } catch (_) { return ''; }
+      };
+      const savePreferredVoiceName = (name) => {
+        try { localStorage.setItem(TTS_PREF_KEY, name || ''); } catch (_) {}
+      };
       const refreshVoices = () => {
         voices = synth.getVoices();
       };
@@ -287,6 +294,11 @@
 
       const pickSpanishVoice = () => {
         if (!voices || voices.length === 0) return null;
+        const prefName = loadPreferredVoiceName();
+        if (prefName) {
+          const byPref = voices.find(v => v.name === prefName);
+          if (byPref) return byPref;
+        }
         const norm = (s) => (s || '').toLowerCase();
         const femaleHints = ['female', 'mujer', 'sabina', 'monica', 'mónica', 'paulina', 'camila', 'sofia', 'sofía', 'luisa', 'isabella'];
         const isFemaleName = (name) => femaleHints.some(h => norm(name).includes(h));
@@ -359,7 +371,7 @@
           if (currentIndex >= queue.length) { stop(); return; }
           const utter = new SpeechSynthesisUtterance(queue[currentIndex]);
           if (voice) utter.voice = voice;
-          utter.lang = (voice && voice.lang) || 'es-ES';
+          utter.lang = (voice && voice.lang) || 'es-MX';
           utter.rate = 1.0;
           utter.pitch = 1.0;
           utter.onend = () => { currentIndex += 1; playNext(); };
@@ -474,7 +486,13 @@
       });
 
       // Expose minimal controls for potential future UI hooks
-      window.ccgTTS = { speak: (t) => speakChunks(t), stop };
+      window.ccgTTS = {
+        speak: (t) => speakChunks(t),
+        stop,
+        getVoices: () => (typeof window.speechSynthesis !== 'undefined' ? window.speechSynthesis.getVoices() : []),
+        getPreferredVoiceName: () => loadPreferredVoiceName(),
+        setPreferredVoice: (name) => savePreferredVoiceName(name)
+      };
     })();
 
     // Accessibility preferences panel (site-wide)
@@ -528,6 +546,62 @@
       close.textContent = 'Cerrar';
 
       panel.appendChild(title);
+
+      // Voice selector for TTS
+      const voiceRow = document.createElement('div');
+      voiceRow.className = 'a11y-row';
+      const voiceLabel = document.createElement('label');
+      voiceLabel.textContent = 'Voz de lectura';
+      voiceLabel.style.display = 'block';
+      const voiceSelect = document.createElement('select');
+      voiceSelect.setAttribute('aria-label', 'Seleccionar voz de lectura');
+      voiceSelect.style.maxWidth = '100%';
+
+      const preferredName = (window.ccgTTS && window.ccgTTS.getPreferredVoiceName) ? window.ccgTTS.getPreferredVoiceName() : '';
+      const populateVoices = () => {
+        const all = (window.ccgTTS && window.ccgTTS.getVoices) ? window.ccgTTS.getVoices() : [];
+        const isSpanish = (v) => /^(es[-_])/i.test(v.lang) || /español/i.test(v.name);
+        const opts = all.filter(isSpanish);
+        voiceSelect.innerHTML = '';
+        if (opts.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Voces no disponibles';
+          voiceSelect.appendChild(opt);
+          voiceSelect.disabled = true;
+          return;
+        }
+        voiceSelect.disabled = false;
+        opts.forEach((v) => {
+          const opt = document.createElement('option');
+          opt.value = v.name;
+          opt.textContent = `${v.name} (${v.lang})`;
+          voiceSelect.appendChild(opt);
+        });
+        const current = (window.ccgTTS && window.ccgTTS.getPreferredVoiceName) ? window.ccgTTS.getPreferredVoiceName() : '';
+        if (current) {
+          voiceSelect.value = current;
+        } else {
+          // Try to default to es-MX if present
+          const mx = opts.find(v => /^(es[-_]?mx)\b/i.test(v.lang));
+          if (mx) voiceSelect.value = mx.name;
+        }
+      };
+
+      voiceSelect.addEventListener('change', () => {
+        if (window.ccgTTS && window.ccgTTS.setPreferredVoice) {
+          window.ccgTTS.setPreferredVoice(voiceSelect.value || '');
+        }
+      });
+
+      voiceRow.appendChild(voiceLabel);
+      voiceRow.appendChild(voiceSelect);
+      panel.appendChild(voiceRow);
+
+      if (typeof window.speechSynthesis !== 'undefined') {
+        populateVoices();
+        window.speechSynthesis.onvoiceschanged = populateVoices;
+      }
 
       const makeRow = (key, def) => {
         const row = document.createElement('label');
