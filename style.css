@@ -602,10 +602,10 @@ section#gestores .hero-content h3 + ul {
 
 /* Active/hover highlight for headings */
 .section .hero-content .collapsible-toggle:hover {
-  background: rgba(255, 122, 0, 0.06);
+  background: var(--accent-100);
 }
 .section.section--active .hero-content .collapsible-toggle {
-  background: rgba(255, 122, 0, 0.10);
+  background: var(--accent-100);
   border-left: 3px solid var(--accent);
 }
 
@@ -651,7 +651,7 @@ section#gestores .hero-content h3 + ul {
 }
 .index-list a:hover { text-decoration: underline; }
 .index-list a.is-active { 
-  background: rgba(255, 122, 0, 0.12);
+  background: var(--accent-100);
   color: var(--black);
   text-decoration: none;
 }
@@ -673,3 +673,119 @@ section#gestores .hero-content h3 + ul {
 /* Alternado controlado por clase (aplicado vía JS en cv.html) */
 .page-cv main > .section { background: var(--white); }
 .page-cv main > .section.section--alt { background: var(--gray-50); }
+
+/* NEW: stable hover/active visual highlight for sections to avoid flicker */
+.page-cv main > .section {
+  border-left: 3px solid transparent; /* reserve space to avoid jump */
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.page-cv main > .section:hover {
+  background: var(--accent-100);
+  border-left-color: var(--accent);
+}
+.page-cv main > .section.section--active {
+  border-left-color: var(--accent);
+  background: var(--accent-100);
+}
+
+/* NEW: hide section content when collapsed (except the heading) */
+.section.is-collapsed .hero-content > :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) { display: none; }
+
+/* Back to top floating button */
+.back-to-top {
+  position: fixed;
+  right: 16px;
+  bottom: 96px; /* sit above the accessibility button at bottom:16px and panel at bottom:64px */
+  z-index: 1000; /* below splash (9999) and a11y panel (1001) but above content */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--gray-200);
+  background: var(--accent);
+  color: var(--black);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+.back-to-top:hover { box-shadow: var(--shadow-md); filter: brightness(0.98); }
+.back-to-top:focus-visible { outline: 2px solid var(--gray-400); outline-offset: 2px; }
+@media (max-width: 520px) {
+  .back-to-top { right: 12px; bottom: 92px; }
+}
+
+/* Right-side TOC rail (hybrid scrollspy) */
+.toc-rail {
+  position: fixed;
+  right: 8px;
+  top: 96px; /* below header */
+  bottom: 140px; /* above a11y button (16px) and back-to-top (96px) */
+  width: 20px;
+  z-index: 999; /* below a11y panel (1001) and splash (9999) */
+  display: grid;
+  place-items: center;
+  pointer-events: none; /* enable only on children */
+}
+.toc-rail .toc-line {
+  position: relative;
+  width: 4px;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gray-200);
+}
+.toc-rail .toc-line .toc-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 0%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: height .15s ease;
+}
+.toc-rail .toc-dots {
+  position: absolute;
+  inset: 0;
+  list-style: none;
+  margin: 0; padding: 0;
+}
+.toc-rail .toc-dot {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  width: 12px; height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--gray-400);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.toc-rail .toc-dot:hover { filter: brightness(0.98); }
+.toc-rail .toc-dot.is-active { border-color: var(--accent); background: var(--accent); }
+/* Custom tooltip using data-label */
+.toc-rail .toc-dot::after {
+  content: attr(data-label);
+  position: absolute;
+  right: 140%;
+  top: 50%; transform: translateY(-50%);
+  background: rgba(17,17,17,0.92);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+  opacity: 0; pointer-events: none;
+  transition: opacity .12s ease;
+}
+.toc-rail .toc-dot:hover::after,
+.toc-rail .toc-dot:focus-visible::after { opacity: 1; }
+
+@media (max-width: 900px) {
+  .toc-rail { display: none; }
+}

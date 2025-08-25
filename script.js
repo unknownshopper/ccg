@@ -336,7 +336,7 @@
     }
 
     // CV: Collapsible sections (dropdown per section)
-    if (path === 'cv.html') {
+    if (document.body && document.body.classList.contains('page-cv')) {
       const STORAGE_KEY = 'cv_sections_state_v1';
       const loadState = () => {
         try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; } catch (_) { return {}; }
@@ -359,36 +359,40 @@
       sections.forEach((section, idx) => {
         const container = section.querySelector('.hero-content') || section;
         const heading = container.querySelector('h1, h2, h3, h4, h5, h6');
-        if (!heading) return;
-
-        // Make heading behave like a button
-        heading.classList.add('collapsible-toggle');
-        heading.setAttribute('role', 'button');
-        heading.setAttribute('tabindex', '0');
-
-        // ARIA relationships
         const secId = section.id || `section-${idx + 1}`;
         if (!section.id) section.id = secId;
-        heading.setAttribute('aria-controls', secId);
 
         // Initial state: use persisted state; default = ALL OPEN when there's no persisted state
         const persisted = Object.prototype.hasOwnProperty.call(state, secId) ? !!state[secId] : null;
         const expandedInitially = persisted !== null ? persisted : (!hasPersistedAny ? true : (idx === 0));
         section.classList.toggle('is-collapsed', !expandedInitially);
-        heading.setAttribute('aria-expanded', expandedInitially ? 'true' : 'false');
 
-        const toggle = () => {
-          const collapsed = section.classList.toggle('is-collapsed');
-          const expanded = !collapsed;
-          heading.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-          state[secId] = expanded;
-          saveState(state);
-        };
+        // Make heading interactive and visually indicate it's clickable
+        if (heading) {
+          heading.classList.add('collapsible-toggle'); // provides chevron indicator via CSS
+          // Accessibility hints
+          heading.setAttribute('role', 'button');
+          heading.setAttribute('tabindex', '0');
+          heading.setAttribute('aria-controls', secId);
+          heading.setAttribute('aria-expanded', expandedInitially ? 'true' : 'false');
 
-        heading.addEventListener('click', toggle);
-        heading.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
-        });
+          const toggle = () => {
+            const collapsed = section.classList.toggle('is-collapsed');
+            const expanded = !collapsed;
+            heading.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            state[secId] = expanded;
+            saveState(state);
+          };
+          // Avoid toggling when user clicks links inside the heading
+          heading.addEventListener('click', (e) => {
+            const link = e.target && (e.target.closest ? e.target.closest('a[href]') : null);
+            if (link) return; // let the link navigate without collapsing
+            toggle();
+          });
+          heading.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+          });
+        }
       });
 
       // If URL hash points to a section, ensure it's expanded and scroll to it
@@ -397,12 +401,10 @@
         if (!id) return;
         const target = document.getElementById(id);
         if (!target) return;
-        const heading = target.querySelector('.hero-content h1, .hero-content h2, .hero-content h3, .hero-content h4, .hero-content h5, .hero-content h6');
-        if (heading) {
-          target.classList.remove('is-collapsed');
-          heading.setAttribute('aria-expanded', 'true');
-          state[id] = true; saveState(state);
-        }
+        target.classList.remove('is-collapsed');
+        const h = target.querySelector('.hero-content h1, .hero-content h2, .hero-content h3, .hero-content h4, .hero-content h5, .hero-content h6');
+        if (h) h.setAttribute('aria-expanded', 'true');
+        state[id] = true; saveState(state);
         const reduce = document.documentElement.classList.contains('a11y-reduce-motion') || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
         target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
       };
@@ -414,10 +416,9 @@
       const btnCollapseAll = document.getElementById('collapse-all');
       const setAll = (expanded) => {
         sections.forEach((section) => {
-          const heading = section.querySelector('.hero-content h1, .hero-content h2, .hero-content h3, .hero-content h4, .hero-content h5, .hero-content h6');
-          if (!heading) return;
           section.classList.toggle('is-collapsed', !expanded);
-          heading.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+          const h = section.querySelector('.hero-content h1, .hero-content h2, .hero-content h3, .hero-content h4, .hero-content h5, .hero-content h6');
+          if (h) h.setAttribute('aria-expanded', expanded ? 'true' : 'false');
           if (section.id) state[section.id] = expanded;
         });
         saveState(state);
@@ -472,6 +473,137 @@
         window.addEventListener('resize', onScroll);
         onScroll();
       }
+
+      // Right-side TOC rail (hybrid scrollspy for main sections)
+      (function setupTocRail() {
+        if (!sections.length) return;
+        // Build rail
+        const rail = document.createElement('nav');
+        rail.className = 'toc-rail';
+        rail.setAttribute('aria-label', 'Navegación por secciones');
+
+        const line = document.createElement('div');
+        line.className = 'toc-line';
+        const progress = document.createElement('div');
+        progress.className = 'toc-progress';
+        line.appendChild(progress);
+
+        const list = document.createElement('ul');
+        list.className = 'toc-dots';
+
+        // Consider only main sections -> use first H2 inside each section for label; fallback to section id
+        const mainSections = sections.map((section, idx) => {
+          const heading = section.querySelector('.hero-content h2, h2') || section.querySelector('h2');
+          const label = (heading && (heading.textContent || '').trim()) || (section.id || `Sección ${idx + 1}`);
+          return { section, label };
+        });
+
+        const dots = new Map(); // id -> dot element
+        mainSections.forEach(({ section, label }) => {
+          if (!section.id) section.id = `section-${Math.random().toString(36).slice(2, 7)}`;
+          const li = document.createElement('li');
+          const dot = document.createElement('button');
+          dot.type = 'button';
+          dot.className = 'toc-dot';
+          dot.setAttribute('aria-label', label);
+          dot.setAttribute('data-label', label);
+          dot.setAttribute('data-target', section.id);
+          dot.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Ensure expanded and scroll into view
+            section.classList.remove('is-collapsed');
+            const h = section.querySelector('.hero-content h1, .hero-content h2, .hero-content h3, .hero-content h4, .hero-content h5, .hero-content h6');
+            if (h) h.setAttribute('aria-expanded', 'true');
+            if (history.pushState) { history.pushState(null, '', `#${section.id}`); }
+            const reduce = document.documentElement.classList.contains('a11y-reduce-motion') || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            section.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+          });
+          li.appendChild(dot);
+          list.appendChild(li);
+          dots.set(section.id, dot);
+        });
+
+        rail.appendChild(line);
+        rail.appendChild(list);
+        document.body.appendChild(rail);
+
+        // Position dots and update progress
+        const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+        const recalcPositions = () => {
+          const first = mainSections[0].section;
+          const last = mainSections[mainSections.length - 1].section;
+          const firstTop = first.offsetTop;
+          const total = Math.max(1, (last.offsetTop + last.offsetHeight) - firstTop);
+          mainSections.forEach(({ section }) => {
+            const ratio = clamp((section.offsetTop - firstTop) / total, 0, 1);
+            const dot = dots.get(section.id);
+            if (dot) dot.style.top = `${ratio * 100}%`;
+          });
+          updateProgress();
+        };
+
+        const setActiveDot = (id) => {
+          dots.forEach((el, key) => el.classList.toggle('is-active', key === id));
+          // Keep aria-current for SRs
+          dots.forEach((el, key) => {
+            if (key === id) el.setAttribute('aria-current', 'true');
+            else el.removeAttribute('aria-current');
+          });
+        };
+
+        const updateFromActiveSection = () => {
+          const active = document.querySelector('main .section.section--active');
+          const id = active ? active.id : (mainSections[0] && mainSections[0].section.id);
+          if (id) setActiveDot(id);
+        };
+
+        const updateProgress = () => {
+          const first = mainSections[0].section;
+          const last = mainSections[mainSections.length - 1].section;
+          const firstTop = first.offsetTop;
+          const total = Math.max(1, (last.offsetTop + last.offsetHeight) - firstTop);
+          const probe = window.scrollY + window.innerHeight * 0.33;
+          const progressed = clamp((probe - firstTop) / total, 0, 1);
+          progress.style.height = `${progressed * 100}%`;
+        };
+
+        const onScroll = () => { updateFromActiveSection(); updateProgress(); };
+        const onResize = () => { recalcPositions(); updateFromActiveSection(); };
+
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onResize);
+
+        // Initial layout
+        recalcPositions();
+        updateFromActiveSection();
+      })();
+
+      // Floating "Back to top" button
+      (function setupBackToTop() {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'back-to-top';
+        btn.className = 'back-to-top';
+        btn.setAttribute('aria-label', 'Regresar al inicio');
+        btn.setAttribute('title', 'Regresar al inicio');
+        btn.textContent = '↑';
+        btn.style.display = 'none';
+        document.body.appendChild(btn);
+
+        const THRESHOLD = 120;
+        const onScroll = () => {
+          if (window.scrollY > THRESHOLD) btn.style.display = 'inline-flex';
+          else btn.style.display = 'none';
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll);
+        onScroll();
+
+        btn.addEventListener('click', () => {
+          const reduce = document.documentElement.classList.contains('a11y-reduce-motion') || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+          window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+        });
+      })();
     }
 
     // ===============================
@@ -704,6 +836,7 @@
     (function accessibilityPanel() {
       const root = document.documentElement;
       const STORAGE_KEY = 'a11y_prefs_v1';
+      const FONT_KEY = 'a11y_font_scale_pct_v1';
       const PREFS = {
         contrast: { className: 'a11y-contrast', label: 'Alto contraste' },
         reduceMotion: { className: 'a11y-reduce-motion', label: 'Reducir movimiento' },
@@ -714,12 +847,35 @@
       // Load prefs
       let state = {};
       try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; } catch (_) { state = {}; }
+      // Load font scale (percentage). Default 100. If legacy largeText is on and no explicit scale, set 115.
+      const loadFontScale = () => {
+        let pct = 0;
+        try { pct = parseInt(localStorage.getItem(FONT_KEY) || '0', 10); } catch (_) { pct = 0; }
+        if (!pct) {
+          if (state.largeText) pct = 115; // legacy mapping
+          else pct = 100;
+        }
+        return Math.max(80, Math.min(180, pct));
+      };
+      const saveFontScale = (pct) => { try { localStorage.setItem(FONT_KEY, String(pct)); } catch (_) {} };
+
+      const applyFontScale = (pct) => {
+        // Apply as root font-size percentage for simplicity
+        root.style.fontSize = `${pct}%`;
+      };
+
       const apply = () => {
         Object.entries(PREFS).forEach(([key, def]) => {
           const on = !!state[key];
           root.classList.toggle(def.className, on);
         });
+        applyFontScale(loadFontScale());
       };
+
+      const save = (newState) => {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(newState || {})); } catch (_) {}
+      };
+
       apply();
 
       // Build UI
@@ -736,13 +892,9 @@
       panel.setAttribute('aria-labelledby', 'a11y-title');
       panel.hidden = true;
 
-      const list = document.createElement('div');
-      list.className = 'a11y-options';
-
       const title = document.createElement('h2');
       title.id = 'a11y-title';
       title.textContent = 'Accesibilidad';
-      title.className = 'h2';
 
       const close = document.createElement('button');
       close.type = 'button';
@@ -752,6 +904,40 @@
 
       panel.appendChild(title);
 
+      // Font size control (range)
+      const fontRow = document.createElement('div');
+      fontRow.className = 'a11y-row';
+      const fontLabel = document.createElement('label');
+      fontLabel.textContent = 'Tamaño de texto';
+      fontLabel.style.display = 'block';
+      const fontWrap = document.createElement('div');
+      fontWrap.style.display = 'flex';
+      fontWrap.style.alignItems = 'center';
+      fontWrap.style.gap = '8px';
+      const fontRange = document.createElement('input');
+      fontRange.type = 'range';
+      fontRange.min = '90';
+      fontRange.max = '150';
+      fontRange.step = '5';
+      const currentPct = loadFontScale();
+      fontRange.value = String(currentPct);
+      const fontOut = document.createElement('output');
+      fontOut.setAttribute('aria-live', 'polite');
+      fontOut.textContent = `${currentPct}%`;
+      fontRange.addEventListener('input', () => {
+        const pct = parseInt(fontRange.value, 10) || 100;
+        fontOut.textContent = `${pct}%`;
+        applyFontScale(pct);
+        saveFontScale(pct);
+        // When explicit font chosen, turn off legacy largeText toggle if present
+        if (state.largeText) { state.largeText = false; save(state); }
+      });
+      fontWrap.appendChild(fontRange);
+      fontWrap.appendChild(fontOut);
+      fontRow.appendChild(fontLabel);
+      fontRow.appendChild(fontWrap);
+      panel.appendChild(fontRow);
+
       // Voice selector for TTS
       const voiceRow = document.createElement('div');
       voiceRow.className = 'a11y-row';
@@ -760,70 +946,89 @@
       voiceLabel.style.display = 'block';
       const voiceSelect = document.createElement('select');
       voiceSelect.setAttribute('aria-label', 'Seleccionar voz de lectura');
+      voiceSelect.style.minWidth = '220px';
       voiceSelect.style.maxWidth = '100%';
-
-      const preferredName = (window.ccgTTS && window.ccgTTS.getPreferredVoiceName) ? window.ccgTTS.getPreferredVoiceName() : '';
-      const populateVoices = () => {
-        const all = (window.ccgTTS && window.ccgTTS.getVoices) ? window.ccgTTS.getVoices() : [];
-        const isSpanish = (v) => /^(es[-_])/i.test(v.lang) || /español/i.test(v.name);
-        const opts = all.filter(isSpanish);
-        voiceSelect.innerHTML = '';
-        if (opts.length === 0) {
-          const opt = document.createElement('option');
-          opt.value = '';
-          opt.textContent = 'Voces no disponibles';
-          voiceSelect.appendChild(opt);
-          voiceSelect.disabled = true;
-          return;
-        }
-        voiceSelect.disabled = false;
-        opts.forEach((v) => {
-          const opt = document.createElement('option');
-          opt.value = v.name;
-          opt.textContent = `${v.name} (${v.lang})`;
-          voiceSelect.appendChild(opt);
-        });
-        const current = (window.ccgTTS && window.ccgTTS.getPreferredVoiceName) ? window.ccgTTS.getPreferredVoiceName() : '';
-        if (current) {
-          voiceSelect.value = current;
-        } else {
-          // Try to default to es-MX if present
-          const mx = opts.find(v => /^(es[-_]?mx)\b/i.test(v.lang));
-          if (mx) voiceSelect.value = mx.name;
-        }
-      };
-
-      voiceSelect.addEventListener('change', () => {
-        if (window.ccgTTS && window.ccgTTS.setPreferredVoice) {
-          window.ccgTTS.setPreferredVoice(voiceSelect.value || '');
-        }
-      });
 
       voiceRow.appendChild(voiceLabel);
       voiceRow.appendChild(voiceSelect);
       panel.appendChild(voiceRow);
 
-      if (typeof window.speechSynthesis !== 'undefined') {
-        populateVoices();
-        window.speechSynthesis.onvoiceschanged = populateVoices;
-      }
+      // Populate voice options robustly
+      (function setupVoiceSelect() {
+        if (typeof window.speechSynthesis === 'undefined') {
+          voiceSelect.disabled = true;
+          const opt = document.createElement('option');
+          opt.textContent = 'No disponible en este navegador';
+          voiceSelect.appendChild(opt);
+          return;
+        }
+        const synth = window.speechSynthesis;
+        const preferredName = (window.ccgTTS && window.ccgTTS.getPreferredVoiceName) ? window.ccgTTS.getPreferredVoiceName() : '';
+        const populate = () => {
+          const list = synth.getVoices();
+          if (!list || list.length === 0) return false;
+          // Build options: prefer Spanish voices on top
+          const isSpanish = (v) => /(^es\b)|(^es[-_])/i.test(v.lang) || /spanish|español|mexico|méxico|mx/i.test((v.name||''));
+          const sorted = list.slice().sort((a, b) => {
+            const aEs = isSpanish(a) ? 0 : 1;
+            const bEs = isSpanish(b) ? 0 : 1;
+            const n1 = (a.name||'').toLowerCase();
+            const n2 = (b.name||'').toLowerCase();
+            if (aEs !== bEs) return aEs - bEs;
+            return n1.localeCompare(n2);
+          });
+          voiceSelect.innerHTML = '';
+          sorted.forEach((v) => {
+            const opt = document.createElement('option');
+            opt.value = v.name;
+            opt.textContent = `${v.name} (${v.lang})`;
+            voiceSelect.appendChild(opt);
+          });
+          // Select preferred if available; otherwise pick a Spanish voice
+          const pickSpanish = sorted.find((v) => isSpanish(v));
+          const target = preferredName && sorted.find((v) => v.name === preferredName) || pickSpanish || sorted[0];
+          if (target) voiceSelect.value = target.name;
+          return true;
+        };
+        const ok = populate();
+        if (!ok) {
+          // Some engines load voices asynchronously
+          const retry = () => { if (populate()) { synth.removeEventListener('voiceschanged', retry); } };
+          synth.addEventListener('voiceschanged', retry);
+          setTimeout(populate, 300);
+          setTimeout(populate, 1200);
+        }
+        voiceSelect.addEventListener('change', () => {
+          const name = voiceSelect.value || '';
+          if (window.ccgTTS && window.ccgTTS.setPreferredVoice) {
+            window.ccgTTS.setPreferredVoice(name);
+          }
+        });
+      })();
+
+      // Preferences toggles
+      const list = document.createElement('ul');
+      list.className = 'a11y-list';
 
       const makeRow = (key, def) => {
-        const row = document.createElement('label');
-        row.className = 'a11y-row';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = !!state[key];
-        cb.addEventListener('change', () => {
-          state[key] = cb.checked;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        const li = document.createElement('li');
+        li.className = 'a11y-item';
+        const id = `a11y-${key}`;
+        const label = document.createElement('label');
+        label.setAttribute('for', id);
+        label.textContent = def.label;
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = id;
+        input.checked = !!state[key];
+        input.addEventListener('change', () => {
+          state[key] = !!input.checked;
+          save(state);
           apply();
         });
-        const span = document.createElement('span');
-        span.textContent = def.label;
-        row.appendChild(cb);
-        row.appendChild(span);
-        return row;
+        li.appendChild(input);
+        li.appendChild(label);
+        return li;
       };
 
       Object.entries(PREFS).forEach(([key, def]) => list.appendChild(makeRow(key, def)));
@@ -835,20 +1040,13 @@
 
       const openPanel = () => {
         panel.hidden = false;
-        // focus first checkbox
-        const first = panel.querySelector('input[type="checkbox"]');
-        if (first) first.focus();
         document.addEventListener('keydown', onKey);
-        document.addEventListener('click', onClickOutside, true);
       };
       const closePanel = () => {
         panel.hidden = true;
-        btn.focus();
         document.removeEventListener('keydown', onKey);
-        document.removeEventListener('click', onClickOutside, true);
       };
       const onKey = (e) => { if (e.key === 'Escape') closePanel(); };
-      const onClickOutside = (e) => { if (!panel.contains(e.target) && e.target !== btn) closePanel(); };
 
       btn.addEventListener('click', () => {
         if (panel.hidden) openPanel(); else closePanel();
