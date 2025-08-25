@@ -567,3 +567,47 @@ html.a11y-reduce-motion *::after {
   display: block;
   filter: drop-shadow(0 2px 8px rgba(0,0,0,0.08));
 }
+
+/* Figures: full-width image with comfortable spacing */
+figure { margin: 16px 0 20px; }
+figure img { width: 100%; height: auto; display: block; }
+figure figcaption { margin-top: 6px; font-size: 0.95rem; color: #555; }
+
+/* Gestores: divisores sutiles entre bloques */
+section#gestores .hero-content h3 {
+  margin-top: 28px;
+}
+section#gestores .hero-content h3:not(:first-of-type) {
+  padding-top: 18px;
+  border-top: 1px solid var(--gray-200);
+}
+section#gestores .hero-content h3 + ul {
+  margin-top: 10px;
+}
+
+/* Collapsible sections (cv.html): heading as toggle */
+.section .hero-content .collapsible-toggle {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section .hero-content .collapsible-toggle::after {
+  content: '';
+  margin-left: auto;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--gray-600);
+  border-bottom: 2px solid var(--gray-600);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+.section.is-collapsed .hero-content .collapsible-toggle::after {
+  transform: rotate(-135deg);
+}
+/* Hide all siblings except the toggle heading when collapsed */
+.section.is-collapsed .hero-content > *:not(.collapsible-toggle) {
+  display: none !important;
+}
+/* Keep basic spacing tight when collapsed */
+.section.is-collapsed { padding-bottom: 8px; }

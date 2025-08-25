@@ -335,6 +335,41 @@
       });
     }
 
+    // CV: Collapsible sections (dropdown per section)
+    if (path === 'cv.html') {
+      const sections = Array.from(document.querySelectorAll('main .section'));
+      sections.forEach((section, idx) => {
+        const container = section.querySelector('.hero-content') || section;
+        const heading = container.querySelector('h1, h2, h3, h4, h5, h6');
+        if (!heading) return;
+
+        // Make heading behave like a button
+        heading.classList.add('collapsible-toggle');
+        heading.setAttribute('role', 'button');
+        heading.setAttribute('tabindex', '0');
+
+        // ARIA relationships
+        const secId = section.id || `section-${idx + 1}`;
+        if (!section.id) section.id = secId;
+        heading.setAttribute('aria-controls', secId);
+
+        // Initial state: first open, others collapsed
+        const collapsedInitially = idx > 0;
+        section.classList.toggle('is-collapsed', collapsedInitially);
+        heading.setAttribute('aria-expanded', collapsedInitially ? 'false' : 'true');
+
+        const toggle = () => {
+          const collapsed = section.classList.toggle('is-collapsed');
+          heading.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        };
+
+        heading.addEventListener('click', toggle);
+        heading.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+        });
+      });
+    }
+
     // ===============================
     // Text-to-Speech for selected text
     // ===============================
