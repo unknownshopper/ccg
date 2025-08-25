@@ -337,7 +337,25 @@
 
     // CV: Collapsible sections (dropdown per section)
     if (path === 'cv.html') {
+      const STORAGE_KEY = 'cv_sections_state_v1';
+      const loadState = () => {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; } catch (_) { return {}; }
+      };
+      const saveState = (state) => {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state || {})); } catch (_) {}
+      };
+      let state = loadState(); // { [sectionId]: true|false } -> true = expanded
+      const hasPersistedAny = !!state && Object.keys(state).length > 0;
+
       const sections = Array.from(document.querySelectorAll('main .section'));
+
+      // Visual alternation: ignore legacy .section--muted to ensure consistent alternation
+      sections.forEach((section) => section.classList.remove('section--muted'));
+      sections.forEach((section, i) => {
+        // i starts at 0: even = white, odd = gray
+        section.classList.toggle('section--alt', (i % 2) === 1);
+      });
+
       sections.forEach((section, idx) => {
         const container = section.querySelector('.hero-content') || section;
         const heading = container.querySelector('h1, h2, h3, h4, h5, h6');
@@ -353,14 +371,18 @@
         if (!section.id) section.id = secId;
         heading.setAttribute('aria-controls', secId);
 
-        // Initial state: first open, others collapsed
-        const collapsedInitially = idx > 0;
-        section.classList.toggle('is-collapsed', collapsedInitially);
-        heading.setAttribute('aria-expanded', collapsedInitially ? 'false' : 'true');
+        // Initial state: use persisted state; default = ALL OPEN when there's no persisted state
+        const persisted = Object.prototype.hasOwnProperty.call(state, secId) ? !!state[secId] : null;
+        const expandedInitially = persisted !== null ? persisted : (!hasPersistedAny ? true : (idx === 0));
+        section.classList.toggle('is-collapsed', !expandedInitially);
+        heading.setAttribute('aria-expanded', expandedInitially ? 'true' : 'false');
 
         const toggle = () => {
           const collapsed = section.classList.toggle('is-collapsed');
-          heading.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          const expanded = !collapsed;
+          heading.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+          state[secId] = expanded;
+          saveState(state);
         };
 
         heading.addEventListener('click', toggle);
@@ -368,6 +390,69 @@
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
         });
       });
+
+      // If URL hash points to a section, ensure it's expanded and scroll to it
+      const openHashTarget = () => {
+        const id = (location.hash || '').replace('#', '');
+        if (!id) return;
+        const target = document.getElementById(id);
+        if (!target) return;
+        const heading = target.querySelector('.hero-content h1, .hero-content h2, .hero-content h3, .hero-content h4, .hero-content h5, .hero-content h6');
+        if (heading) {
+          target.classList.remove('is-collapsed');
+          heading.setAttribute('aria-expanded', 'true');
+          state[id] = true; saveState(state);
+        }
+        const reduce = document.documentElement.classList.contains('a11y-reduce-motion') || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+      };
+      openHashTarget();
+      window.addEventListener('hashchange', openHashTarget);
+
+      // Expand/Collapse All actions
+      const btnExpandAll = document.getElementById('expand-all');
+      const btnCollapseAll = document.getElementById('collapse-all');
+      const setAll = (expanded) => {
+        sections.forEach((section) => {
+          const heading = section.querySelector('.hero-content h1, .hero-content h2, .hero-content h3, .hero-content h4, .hero-content h5, .hero-content h6');
+          if (!heading) return;
+          section.classList.toggle('is-collapsed', !expanded);
+          heading.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+          if (section.id) state[section.id] = expanded;
+        });
+        saveState(state);
+      };
+      if (btnExpandAll) btnExpandAll.addEventListener('click', () => setAll(true));
+      if (btnCollapseAll) btnCollapseAll.addEventListener('click', () => setAll(false));
+
+      // Scrollspy: highlight active section link in index
+      const indexLinks = Array.from(document.querySelectorAll('#indice .index-list a'));
+      const byId = new Map(indexLinks.map((a) => [a.getAttribute('href').replace('#',''), a]));
+      const setActiveLink = (id) => {
+        indexLinks.forEach((a) => a.classList.toggle('is-active', a.getAttribute('href') === `#${id}`));
+      };
+      const onScroll = () => {
+        let currentId = null;
+        let bestTop = Number.POSITIVE_INFINITY;
+        sections.forEach((section) => {
+          const rect = section.getBoundingClientRect();
+          // Prefer the section whose top is closest to top but not far above
+          const top = rect.top;
+          if (top <= window.innerHeight * 0.33 && Math.abs(top) < bestTop) {
+            currentId = section.id || currentId;
+            bestTop = Math.abs(top);
+          }
+        });
+        if (!currentId) {
+          // fallback: the first visible section
+          const visible = sections.find((s) => s.getBoundingClientRect().top >= 0);
+          if (visible && visible.id) currentId = visible.id;
+        }
+        if (currentId && byId.has(currentId)) setActiveLink(currentId);
+      };
+      document.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
+      onScroll();
     }
 
     // ===============================

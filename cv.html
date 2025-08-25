@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css">
 
 </head>
-<body>
+<body class="page-cv">
     <header class="header">
       <div class="container navbar">
         <a class="brand" href="index.html">
@@ -25,6 +25,37 @@
     </header>
 
     <main id="main">
+      <div class="index-actions" role="group" aria-label="Acciones sobre secciones">
+        <button type="button" id="expand-all" class="btn">Expandir todo</button>
+        <button type="button" id="collapse-all" class="btn btn--secondary">Colapsar todo</button>
+      </div>
+      <section id="indice" class="section section--muted">
+        <div class="container hero">
+          <div class="hero-content">
+            <h2 class="display">Índice</h2>
+            <nav aria-label="Índice de secciones">
+              <ul class="index-list">
+                <li><a href="#experiencia">Experiencia</a></li>
+                <li><a href="#alcance-servicios">Alcance de servicios</a></li>
+                <li><a href="#herramientas">Herramientas</a></li>
+                <li><a href="#gestores">Gestores</a></li>
+                <li><a href="#ventajas">Ventajas</a></li>
+                <li><a href="#sigedi">SIGEDI</a></li>
+                <li><a href="#competencias">Competencias</a></li>
+                <li><a href="#pii">PII</a></li>
+                <li><a href="#ciclo-inteligencia">Ciclo de inteligencia</a></li>
+                <li><a href="#pii-otras">PII vs otras</a></li>
+                <li><a href="#grafico-vinculos">Gráfico de vínculos</a></li>
+                <li><a href="#procesamiento-cdr">Procesamiento de CDR</a></li>
+                <li><a href="#cdr-lineas">CDR: líneas de tiempo</a></li>
+                <li><a href="#consulta-alpr">Consulta ALPR</a></li>
+                <li><a href="#consulta-bio">Consulta biométrica</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </section>
+
       <section id="sobre-nosotros" class="section">
         <div class="container hero">
           <div class="hero-content">
@@ -71,7 +102,7 @@
         <div class="container hero">
           <div class="hero-content">
             <h2 class="display">Alcance de nuestros servicios</h2>
-            <ul>
+            <ul class="check-list">
               <li>Diseño y acompañamiento en los procesos de gestión del cambio, control interno y administración de riesgos.</li>
               <li>Impartición de talleres y cursos de capacitación especializada que faciliten los procesos de cambio y el fortalecimiento de competencias, para su certificación.</li>
               <li>Consultoría especializada en materia de análisis y productos de inteligencia.</li>
@@ -246,7 +277,7 @@
         <div class="container hero">
           <div class="hero-content">
             <h2 class="display">Ventajas estratégicas</h2>
-            <ul>
+            <ul class="check-list">
               <li>Metodologías basadas en SCRUM: reducir riesgos y maximizar productividad.</li>
               <li>Independencia tecnológica: plataforma de código abierto.</li>
               <li>Capacidad de evolución: cobertura funcional completa; la modularidad permite evolución gradual.</li>
@@ -283,7 +314,7 @@
             </p>
 
             <h3>La plataforma de servicios de SIGEDI ofrece:</h3>
-            <ul>
+            <ul class="check-list">
               <li>Integrar y automatizar el archivo de trámite, concentración e histórico.</li>
               <li>Carátulas con código QR para agilizar la localización de expedientes.</li>
               <li>Digitalización de ~120 hojas por minuto, sin distinción de tamaño o gramaje.</li>
@@ -331,7 +362,7 @@
         <div class="container hero">
           <div class="hero-content">
             <h2 class="display">Plataforma Integral de Inteligencia</h2>
-            <ul>
+            <ul class="check-list">
               <li>Módulo básico (base de datos, análisis y reportes).</li>
               <li>PLN (Procesamiento de Lenguaje Natural).</li>
               <li>ALPR (Repositorio de Lectura de Placas).</li>
@@ -340,10 +371,11 @@
               <li>Integración a fuentes de información actuales.</li>
               <li>Compartición de información (interoperabilidad).</li>
             </ul>
+            <figure>
+              <img src="img2/opii.png" alt="Diagrama de la Plataforma Integral de Inteligencia" loading="lazy">
+              <figcaption class="muted">Arquitectura de la PII y sus módulos principales.</figcaption>
+            </figure>
           </div>
-          <figure>
-            <img src="img2/opii.png" alt="Diagrama de la Plataforma Integral de Inteligencia" loading="lazy">
-          </figure>
         </div>
       </section>
 
@@ -362,6 +394,83 @@
           </div>
         </div>
       </section>
+
+      <section id="pii-otras" class="section">
+        <div class="container hero">
+          <div class="hero-content">
+            <h2 class="display">PII: plataforma integral de inteligencia vs. otras soluciones</h2>
+            <figure>
+              <img src="img2/piivs.png" alt="Comparativa de PII frente a otras soluciones" loading="lazy">
+              <figcaption class="muted">Comparativa de capacidades entre PII y alternativas.</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section id="grafico-vinculos" class="section section--muted">
+        <div class="container hero">
+          <div class="hero-content">
+            <h2 class="display">Gráfico de vínculos</h2>
+            <figure>
+              <img src="img2/vinculos.png" alt="Gráfico de vínculos" loading="lazy">
+              <figcaption class="muted">Relaciones entre entidades y eventos.</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section id="procesamiento-cdr" class="section">
+        <div class="container hero">
+          <div class="hero-content">
+            <h2 class="display">Procesamiento de CDRs</h2>
+            <p>Creación de gráficos de vínculos a partir de CDR.</p>
+            <figure>
+              <img src="img2/gravin.png" alt="Procesamiento de CDR" loading="lazy">
+              <figcaption class="muted">Extracción y visualización de vínculos a partir de CDR.</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section id="cdr-lineas" class="section section--muted">
+        <div class="container hero">
+          <div class="hero-content">
+            <h2 class="display">CDR: líneas de tiempo e histogramas</h2>
+            <p>A partir de campos de fecha es posible generar líneas de tiempo e histogramas.</p>
+            <figure>
+              <img src="img2/cdrlin.png" alt="CDR: líneas de tiempo e histogramas" loading="lazy">
+              <figcaption class="muted">Evolución temporal y distribución de eventos.</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section id="consulta-alpr" class="section">
+        <div class="container hero">
+          <div class="hero-content">
+            <h2 class="display">Consulta ALPR y Mapas</h2>
+            <p>Análisis de lectura de placas y mapas de localizaciones de las lecturas de placa.</p>
+            <figure>
+              <img src="img2/alpr.png" alt="Consulta ALPR y mapas" loading="lazy">
+              <figcaption class="muted">Lectura automática de placas con georreferenciación.</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section id="consulta-bio" class="section section--muted">
+        <div class="container hero">
+          <div class="hero-content">
+            <h2 class="display">Consulta Biométrica</h2>
+            <p>Identificación biométrica facial a través del Módulo Biométrico.</p>
+            <figure>
+              <img src="img2/bio.png" alt="Consulta biométrica" loading="lazy">
+              <figcaption class="muted">Identificación facial a través del módulo biométrico.</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
     </main>
 
     <footer class="footer" id="contacto">

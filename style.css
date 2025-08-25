@@ -597,10 +597,10 @@ section#gestores .hero-content h3 + ul {
   margin-left: auto;
   width: 10px;
   height: 10px;
-  border-right: 2px solid var(--gray-600);
-  border-bottom: 2px solid var(--gray-600);
+  border-right: 2px solid var(--gray-400);
+  border-bottom: 2px solid var(--gray-400);
   transform: rotate(45deg);
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.15s ease;
 }
 .section.is-collapsed .hero-content .collapsible-toggle::after {
   transform: rotate(-135deg);
@@ -611,3 +611,65 @@ section#gestores .hero-content h3 + ul {
 }
 /* Keep basic spacing tight when collapsed */
 .section.is-collapsed { padding-bottom: 8px; }
+
+/* Check-style lists */
+.check-list { list-style: none; padding-left: 0; }
+.check-list li { position: relative; padding-left: 28px; margin: 6px 0; }
+.check-list li::before {
+  content: '✓';
+  position: absolute; left: 0; top: 0.1em;
+  color: var(--accent, #ff7a00);
+  font-weight: 700;
+}
+
+/* Index list */
+.index-list { list-style: none; padding-left: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.index-list a { text-decoration: none; color: var(--black); }
+.index-list a:hover { text-decoration: underline; color: var(--accent); }
+
+/* Index actions and buttons */
+.index-actions { display: flex; gap: 10px; margin: 8px 0 14px; flex-wrap: wrap; justify-content: center; }
+.btn { 
+  appearance: none; border: none; cursor: pointer; 
+  background: var(--accent, #ff7a00); color: #fff; 
+  padding: 8px 12px; border-radius: 8px; font-weight: 600; 
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+.btn:hover { filter: brightness(0.95); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--gray-400); outline-offset: 2px; }
+.btn.btn--secondary {
+  background: transparent; color: var(--black);
+  border: 1px solid var(--gray-300);
+}
+
+/* Refined index list styling */
+.index-list { list-style: none; padding-left: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.index-list a { 
+  text-decoration: none; color: var(--black);
+  padding: 4px 8px; border-radius: 6px; transition: background-color .15s ease, color .15s ease;
+}
+.index-list a:hover { text-decoration: underline; }
+.index-list a.is-active { 
+  background: rgba(255, 122, 0, 0.12);
+  color: var(--black);
+  text-decoration: none;
+}
+
+/* Collapsible toggle: refined chevron + focus */
+.section .hero-content .collapsible-toggle {
+  cursor: pointer; display: flex; align-items: center; gap: 10px;
+}
+.section .hero-content .collapsible-toggle::after {
+  content: '';
+  margin-left: auto; width: 10px; height: 10px;
+  border-right: 2px solid var(--gray-400);
+  border-bottom: 2px solid var(--gray-400);
+  transform: rotate(45deg); transition: transform .2s ease, border-color .15s ease;
+}
+.section.is-collapsed .hero-content .collapsible-toggle::after { transform: rotate(-135deg); }
+.section .hero-content .collapsible-toggle:focus-visible { outline: 2px solid var(--gray-400); outline-offset: 2px; }
+
+/* Alternado controlado por clase (aplicado vía JS en cv.html) */
+.page-cv main > .section { background: var(--white); }
+.page-cv main > .section.section--alt { background: var(--gray-50); }
