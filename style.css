@@ -70,6 +70,7 @@ body {
   min-height: 100vh;
   flex-direction: column;
 }
+*, *::before, *::after { box-sizing: border-box; }
 main { flex: 1; }
 img { max-width: 100%; display: block; }
 a { color: var(--black); text-decoration: none; }
@@ -109,8 +110,8 @@ a:hover { color: var(--accent); }
 .section2 .hero-content .grid.cols-3 {
   display: block;               /* usar columnas en lugar de grid */
   column-count: 1;
-  column-gap: 14px;
-  gap: 14px; /* controla row-gap y column-gap */
+  column-gap: 20px;
+  gap: 20px; /* controla row-gap y column-gap */
   grid-auto-rows: 8px; /* base para calcular spans (coincide con JS) */
   align-items: start;
 }
@@ -133,7 +134,7 @@ a:hover { color: var(--accent); }
   /* Masonry: evitar cortes y permitir flujo en columnas */
   display: inline-block;
   width: 100%;
-  margin: 0 0 14px;
+  margin: 0 0 20px; /* que coincida con el column-gap */
   break-inside: avoid;
 }
 /*.section2 .hero-content .card::before {
@@ -545,6 +546,16 @@ figure { margin: 16px 0 20px; }
 figure img { width: 100%; height: auto; display: block; }
 figure figcaption { margin-top: 6px; font-size: 0.95rem; color: #555; }
 
+/* CV page: constrain figures so images don't look oversized */
+.page-cv .hero-content figure {
+  max-width: 900px;        /* default cap for diagrams/screens */
+  margin-left: auto;
+  margin-right: auto;
+}
+/* Optional modifiers to fine-tune per figure (can add in cv.html when needed) */
+.page-cv .hero-content figure.figure--md { max-width: 720px; }
+.page-cv .hero-content figure.figure--sm { max-width: 560px; }
+
 /* Gestores: divisores sutiles entre bloques */
 section#gestores .hero-content h3 {
   margin-top: 28px;
@@ -808,3 +819,5 @@ html.a11y-contrast .tts-bubble { background: #000; color: #fff; border-color: #f
 .a11y-panel .a11y-row + .a11y-row { margin-top: 8px; }
 .a11y-panel .a11y-list { margin-top: 8px; }
 .a11y-panel .a11y-close { margin-top: 12px; }
+
+.grid .card { margin: 0; }
