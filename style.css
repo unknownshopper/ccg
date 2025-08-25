@@ -444,6 +444,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 :root {
   --accent: #ff7a00; /* orange */
   --accent-600: #e86f00;
+  --accent-100: #fff3e6; /* light tint for hovers/backgrounds */
+  --primary: #111111; /* primary text/heading color */
   --black: #111111;
   --white: #ffffff;
   --gray-25: #fcfcfc;
