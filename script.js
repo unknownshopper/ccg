@@ -24,7 +24,7 @@
         if (splash) return splash;
         splash = document.createElement('div');
         splash.className = 'splash hidden';
-        splash.innerHTML = '<div class="splash__logo"><img src="logoccg.png" alt="CCGLOBAL"></div>';
+        splash.innerHTML = '<div class="splash__logo"><img src="ccglogo.png" alt="CCGLOBAL"></div>';
         document.body.appendChild(splash);
         return splash;
       }
@@ -424,35 +424,54 @@
       };
       if (btnExpandAll) btnExpandAll.addEventListener('click', () => setAll(true));
       if (btnCollapseAll) btnCollapseAll.addEventListener('click', () => setAll(false));
+      // Delegated safety net in case buttons are re-rendered/moved
+      const actions = document.querySelector('.index-actions');
+      if (actions) actions.addEventListener('click', (e) => {
+        const t = e.target.closest && e.target.closest('button');
+        if (!t) return;
+        if (t.id === 'expand-all') { e.preventDefault(); setAll(true); }
+        if (t.id === 'collapse-all') { e.preventDefault(); setAll(false); }
+      });
 
       // Scrollspy: highlight active section link in index
       const indexLinks = Array.from(document.querySelectorAll('#indice .index-list a'));
       const byId = new Map(indexLinks.map((a) => [a.getAttribute('href').replace('#',''), a]));
       const setActiveLink = (id) => {
+        sections.forEach((s) => s.classList.toggle('section--active', s.id === id));
         indexLinks.forEach((a) => a.classList.toggle('is-active', a.getAttribute('href') === `#${id}`));
       };
-      const onScroll = () => {
-        let currentId = null;
-        let bestTop = Number.POSITIVE_INFINITY;
-        sections.forEach((section) => {
-          const rect = section.getBoundingClientRect();
-          // Prefer the section whose top is closest to top but not far above
-          const top = rect.top;
-          if (top <= window.innerHeight * 0.33 && Math.abs(top) < bestTop) {
-            currentId = section.id || currentId;
-            bestTop = Math.abs(top);
+      const ioSupported = 'IntersectionObserver' in window;
+      if (ioSupported) {
+        const io = new IntersectionObserver((entries) => {
+          let best = null;
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            // prefer the one closest to top
+            const top = e.target.getBoundingClientRect().top;
+            if (!best || Math.abs(top) < Math.abs(best.top)) best = { id: e.target.id, top };
           }
-        });
-        if (!currentId) {
-          // fallback: the first visible section
-          const visible = sections.find((s) => s.getBoundingClientRect().top >= 0);
-          if (visible && visible.id) currentId = visible.id;
-        }
-        if (currentId && byId.has(currentId)) setActiveLink(currentId);
-      };
-      document.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', onScroll);
-      onScroll();
+          if (best && byId.has(best.id)) setActiveLink(best.id);
+        }, { root: null, rootMargin: '0px 0px -60% 0px', threshold: [0, 0.1, 0.25, 0.5] });
+        sections.forEach((s) => io.observe(s));
+      } else {
+        const onScroll = () => {
+          let currentId = null; let bestTop = Number.POSITIVE_INFINITY;
+          sections.forEach((section) => {
+            const top = section.getBoundingClientRect().top;
+            if (top <= window.innerHeight * 0.33 && Math.abs(top) < bestTop) {
+              currentId = section.id || currentId; bestTop = Math.abs(top);
+            }
+          });
+          if (!currentId) {
+            const visible = sections.find((s) => s.getBoundingClientRect().top >= 0);
+            if (visible && visible.id) currentId = visible.id;
+          }
+          if (currentId && byId.has(currentId)) setActiveLink(currentId);
+        };
+        document.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll);
+        onScroll();
+      }
     }
 
     // ===============================
