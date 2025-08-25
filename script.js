@@ -272,7 +272,7 @@
 
       // Deep-link hash scrolling and highlight for section headings
       const goToHash = () => {
-        const id = decodeURIComponent(location.hash.replace('#', ''));
+        const id = (location.hash || '').replace('#', '');
         if (!id) return;
         const el = document.getElementById(id);
         if (!el) return;
@@ -615,12 +615,28 @@
 
       let voices = [];
       const TTS_PREF_KEY = 'tts_pref_voice';
+      const TTS_LANG_KEY = 'tts_lang_pref_v1'; // 'es' | 'en' | 'de' | 'fr'
+      const TTS_RATE_KEY = 'tts_rate_v1'; // playback speed multiplier
       const loadPreferredVoiceName = () => {
         try { return localStorage.getItem(TTS_PREF_KEY) || ''; } catch (_) { return ''; }
       };
       const savePreferredVoiceName = (name) => {
         try { localStorage.setItem(TTS_PREF_KEY, name || ''); } catch (_) {}
       };
+      const loadPreferredLang = () => {
+        try { return localStorage.getItem(TTS_LANG_KEY) || 'es'; } catch (_) { return 'es'; }
+      };
+      const savePreferredLang = (lang) => {
+        try { localStorage.setItem(TTS_LANG_KEY, lang || 'es'); } catch (_) {}
+      };
+      const loadPreferredRate = () => {
+        try {
+          const v = parseFloat(localStorage.getItem(TTS_RATE_KEY));
+          return (isNaN(v) || v <= 0) ? 1 : Math.min(4, Math.max(0.5, v));
+        } catch (_) { return 1; }
+      };
+      const savePreferredRate = (rate) => { try { localStorage.setItem(TTS_RATE_KEY, String(rate || 1)); } catch (_) {} };
+
       const refreshVoices = () => {
         voices = synth.getVoices();
       };
@@ -629,90 +645,144 @@
         speechSynthesis.onvoiceschanged = refreshVoices;
       }
 
-      const pickSpanishVoice = () => {
-        if (!voices || voices.length === 0) return null;
-        const prefName = loadPreferredVoiceName();
-        if (prefName) {
-          const byPref = voices.find(v => v.name === prefName);
-          if (byPref) return byPref;
-        }
-        const norm = (s) => (s || '').toLowerCase();
-        const femaleHints = ['female', 'mujer', 'sabina', 'monica', 'mónica', 'paulina', 'camila', 'sofia', 'sofía', 'luisa', 'isabella'];
-        const isFemaleName = (name) => femaleHints.some(h => norm(name).includes(h));
-        const isEsMX = (v) => /^(es[-_]?mx)\b/i.test(v.lang) || /méxico|mexico|\bmx\b/.test(norm(v.name));
-        const isSpanish = (v) => /^(es[-_])/i.test(v.lang) || /español|spanish\s*\(.*\)/i.test(v.name);
-
-        // 1) es-MX + female
-        let best = voices.find(v => isEsMX(v) && isFemaleName(v.name));
-        if (best) return best;
-        // 2) es-MX (any)
-        best = voices.find(v => isEsMX(v));
-        if (best) return best;
-        // 3) Any Spanish + female
-        best = voices.find(v => isSpanish(v) && isFemaleName(v.name));
-        if (best) return best;
-        // 4) Any Spanish (prefer branded engines)
-        best = voices.find(v => isSpanish(v) && /Google|Microsoft|Apple/i.test(v.name));
-        if (best) return best;
-        // 5) Any Spanish
-        best = voices.find(v => isSpanish(v));
-        if (best) return best;
-        // 6) Fallback to first
-        return voices[0] || null;
+      const pickVoiceForLang = (lang) => {
+        // Fixed to Spanish voices; ignore stored preference
+        const list = synth.getVoices();
+        if (!list || !list.length) return null;
+        const sameLang = list.filter(v => (v.lang || '').toLowerCase().startsWith('es'));
+        const preferEsUS = (v) => /(es[-_]?us)/i.test(v.lang) || /\bUS\b|Estados Unidos|United States/i.test(v.name);
+        const brandRank = (n) => (/Google|Microsoft|Apple/i.test(n) ? 0 : 1);
+        const sorted = (sameLang.length ? sameLang : list).sort((a,b) => {
+          // es-US preferred by name/lang match
+          const aUS = preferEsUS(a), bUS = preferEsUS(b);
+          if (aUS !== bUS) return aUS ? -1 : 1;
+          const br = brandRank(a.name) - brandRank(b.name);
+          if (br !== 0) return br;
+          return (a.name||'').localeCompare(b.name||'');
+        });
+        return sorted[0] || null;
       };
 
-      // Ensure chunker is defined before used by speakChunks
-      const splitTextIntoChunks = (text, maxLen = 180) => {
-        const clean = (text || '').replace(/\s+/g, ' ').trim();
-        if (!clean) return [];
-        if (clean.length <= maxLen) return [clean];
-        const chunks = [];
-        const sentenceRe = /([\.!?。！？]+)\s+/g;
-        let lastIndex = 0;
-        let match;
-        const sentences = [];
-        while ((match = sentenceRe.exec(clean)) !== null) {
-          sentences.push(clean.slice(lastIndex, match.index + match[1].length).trim());
-          lastIndex = match.index + match[0].length;
+      // Basic translation using LibreTranslate-compatible API. You may change endpoint in SETTINGS_TRANSLATE_ENDPOINT.
+      const SETTINGS_TRANSLATE_ENDPOINT = 'https://libretranslate.com/translate';
+      const translateText = async (text, targetLang /* 'en'|'de'|'fr' */) => {
+        const src = 'es';
+        if (!text || targetLang === 'es') return text;
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 6000);
+          const res = await fetch(SETTINGS_TRANSLATE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ q: text, source: src, target: targetLang, format: 'text' }),
+            signal: ctrl.signal,
+          });
+          clearTimeout(t);
+          if (!res.ok) throw new Error('translate http ' + res.status);
+          const data = await res.json();
+          return (data && (data.translatedText || data.translation)) || text;
+        } catch (_) {
+          // Fallback to original Spanish if translation fails
+          return text;
         }
-        if (lastIndex < clean.length) sentences.push(clean.slice(lastIndex).trim());
-        const parts = sentences.length ? sentences : [clean];
-        let buf = '';
-        for (const s of parts) {
-          if ((buf + ' ' + s).trim().length <= maxLen) {
-            buf = (buf ? buf + ' ' : '') + s;
-          } else {
-            if (buf) chunks.push(buf);
-            if (s.length <= maxLen) chunks.push(s);
-            else {
-              for (let i = 0; i < s.length; i += maxLen) chunks.push(s.slice(i, i + maxLen));
-            }
-            buf = '';
-          }
-        }
-        if (buf) chunks.push(buf);
-        return chunks.filter(Boolean);
       };
 
       let queue = [];
       let isReading = false;
       let currentIndex = 0;
 
-      const speakChunks = (text) => {
-        queue = splitTextIntoChunks(text);
+      // Split long text into natural-length chunks for TTS
+      const splitTextIntoChunks = (input, maxLen = 200) => {
+        if (!input) return [];
+        const text = String(input).replace(/\s+/g, ' ').trim();
+        if (!text) return [];
+        // Prefer sentence boundaries
+        const sentences = text.split(/(?<=[\.!?¡!¿?\u2026])\s+/u);
+        const chunks = [];
+        let buf = '';
+        const pushBuf = () => {
+          const t = buf.trim();
+          if (t) chunks.push(t);
+          buf = '';
+        };
+        const safeAppend = (s) => {
+          if (!s) return;
+          if ((buf + ' ' + s).trim().length <= maxLen) {
+            buf = (buf ? buf + ' ' : '') + s;
+          } else {
+            // Try split by comma/semicolon first
+            const parts = s.split(/[,;]\s+/);
+            if (parts.length > 1) {
+              parts.forEach((p, i) => {
+                const seg = i < parts.length - 1 ? p + ',' : p;
+                safeAppend(seg);
+              });
+            } else if (s.length > maxLen) {
+              // Hard-wrap very long words/segments
+              for (let i = 0; i < s.length; i += maxLen) {
+                const piece = s.slice(i, i + maxLen);
+                if ((buf + ' ' + piece).trim().length > maxLen) pushBuf();
+                buf = (buf ? buf + ' ' : '') + piece;
+                pushBuf();
+              }
+            } else {
+              pushBuf();
+              buf = s;
+            }
+          }
+        };
+        sentences.forEach((s) => safeAppend(s));
+        pushBuf();
+        return chunks;
+      };
+
+      const speakChunks = async (text) => {
+        // Fixed language: Spanish
+        const lang = 'es';
+        const toSpeak = await translateText(text, lang);
+        queue = splitTextIntoChunks(toSpeak);
         currentIndex = 0;
         isReading = queue.length > 0;
         if (!isReading) return;
-        const voice = pickSpanishVoice();
+        // Ensure we start clean to avoid engine glitches at high rate
+        try { synth.cancel(); } catch (_) {}
+        const voice = pickVoiceForLang(lang);
         const playNext = () => {
           if (currentIndex >= queue.length) { stop(); return; }
           const utter = new SpeechSynthesisUtterance(queue[currentIndex]);
           if (voice) utter.voice = voice;
-          utter.lang = (voice && voice.lang) || 'es-MX';
-          utter.rate = 1.0;
+          // Set utterance language
+          if (voice && voice.lang) utter.lang = voice.lang;
+          else utter.lang = (lang || 'es');
+          // Map UI selection to engine-safe effective rate
+          const getEffectiveRate = () => {
+            const ui = loadPreferredRate();
+            if (ui >= 3.5) return 1.6;   // "4x" -> ~+60%
+            if (ui >= 1.5) return 1.25;  // "2x" -> ~+25%
+            return 1.0;                   // "1x"
+          };
+          const safeRate = getEffectiveRate();
+          utter.rate = safeRate;
           utter.pitch = 1.0;
+          utter.volume = 1.0;
           utter.onend = () => { currentIndex += 1; playNext(); };
-          utter.onerror = () => { currentIndex += 1; playNext(); };
+          utter.onerror = () => {
+            // Some engines fail at high rates; retry once at a lower, safe rate
+            if (!utter._retriedLowerRate && safeRate > 1.2) {
+              utter._retriedLowerRate = true;
+              const retry = new SpeechSynthesisUtterance(queue[currentIndex]);
+              if (voice) retry.voice = voice;
+              retry.lang = utter.lang;
+              retry.rate = 1.2;
+              retry.pitch = 1.0;
+              retry.volume = 1.0;
+              retry.onend = () => { currentIndex += 1; playNext(); };
+              retry.onerror = () => { currentIndex += 1; playNext(); };
+              synth.speak(retry);
+              return;
+            }
+            currentIndex += 1; playNext();
+          };
           synth.speak(utter);
         };
         playNext();
@@ -828,7 +898,11 @@
         stop,
         getVoices: () => (typeof window.speechSynthesis !== 'undefined' ? window.speechSynthesis.getVoices() : []),
         getPreferredVoiceName: () => loadPreferredVoiceName(),
-        setPreferredVoice: (name) => savePreferredVoiceName(name)
+        setPreferredVoice: (name) => savePreferredVoiceName(name),
+        getLang: () => loadPreferredLang(),
+        setLang: (lang) => savePreferredLang(lang),
+        getRate: () => loadPreferredRate(),
+        setRate: (r) => savePreferredRate(r)
       };
     })();
 
@@ -839,8 +913,8 @@
       const FONT_KEY = 'a11y_font_scale_pct_v1';
       const PREFS = {
         contrast: { className: 'a11y-contrast', label: 'Alto contraste' },
-        reduceMotion: { className: 'a11y-reduce-motion', label: 'Reducir movimiento' },
-        largeText: { className: 'a11y-large-text', label: 'Texto grande' },
+        // reduceMotion: { className: 'a11y-reduce-motion', label: 'Reducir movimiento' },
+        // largeText: { className: 'a11y-large-text', label: 'Texto grande' },
         underlineLinks: { className: 'a11y-underline-links', label: 'Subrayar enlaces' },
       };
 
@@ -876,6 +950,15 @@
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(newState || {})); } catch (_) {}
       };
 
+      // Auto-detect high contrast on first visit (no manual setting yet)
+      try {
+        const hasManualContrast = Object.prototype.hasOwnProperty.call(state, 'contrast');
+        if (!hasManualContrast && window.matchMedia) {
+          const prefersMore = (window.matchMedia('(prefers-contrast: more)').matches) || (window.matchMedia('(forced-colors: active)').matches);
+          if (prefersMore) { state.contrast = true; save(state); }
+        }
+      } catch (_) {}
+
       apply();
 
       // Build UI
@@ -883,6 +966,8 @@
       btn.className = 'a11y-button';
       btn.type = 'button';
       btn.setAttribute('aria-label', 'Configuración de accesibilidad');
+      btn.setAttribute('aria-haspopup', 'dialog');
+      btn.setAttribute('aria-expanded', 'false');
       btn.innerHTML = `<img src="accsscc.png" alt="" width="28" height="28" loading="lazy">`;
 
       const panel = document.createElement('div');
@@ -890,19 +975,20 @@
       panel.setAttribute('role', 'dialog');
       panel.setAttribute('aria-modal', 'true');
       panel.setAttribute('aria-labelledby', 'a11y-title');
+      panel.id = 'a11y-panel';
+      btn.setAttribute('aria-controls', 'a11y-panel');
       panel.hidden = true;
 
       const title = document.createElement('h2');
       title.id = 'a11y-title';
       title.textContent = 'Accesibilidad';
 
-      const close = document.createElement('button');
-      close.type = 'button';
-      close.className = 'a11y-close';
-      close.setAttribute('aria-label', 'Cerrar');
-      close.textContent = 'Cerrar';
-
-      panel.appendChild(title);
+      const desc = document.createElement('p');
+      desc.id = 'a11y-desc';
+      desc.className = 'visually-hidden';
+      desc.textContent = 'Ajusta tamaño de texto, idioma y voz. Pulsa Escape para cerrar.';
+      panel.setAttribute('aria-describedby', 'a11y-desc');
+      panel.appendChild(desc);
 
       // Font size control (range)
       const fontRow = document.createElement('div');
@@ -916,7 +1002,9 @@
       fontWrap.style.gap = '8px';
       const fontRange = document.createElement('input');
       fontRange.type = 'range';
-      fontRange.min = '90';
+      fontRange.id = 'a11y-font-range';
+      fontLabel.setAttribute('for', 'a11y-font-range');
+      fontRange.min = '10';
       fontRange.max = '150';
       fontRange.step = '5';
       const currentPct = loadFontScale();
@@ -938,7 +1026,7 @@
       fontRow.appendChild(fontWrap);
       panel.appendChild(fontRow);
 
-      // Voice selector for TTS
+      // Voice selector for TTS (filtered by language)
       const voiceRow = document.createElement('div');
       voiceRow.className = 'a11y-row';
       const voiceLabel = document.createElement('label');
@@ -946,6 +1034,8 @@
       voiceLabel.style.display = 'block';
       const voiceSelect = document.createElement('select');
       voiceSelect.setAttribute('aria-label', 'Seleccionar voz de lectura');
+      voiceSelect.id = 'a11y-voice';
+      voiceLabel.setAttribute('for', 'a11y-voice');
       voiceSelect.style.minWidth = '220px';
       voiceSelect.style.maxWidth = '100%';
 
@@ -953,8 +1043,40 @@
       voiceRow.appendChild(voiceSelect);
       panel.appendChild(voiceRow);
 
-      // Populate voice options robustly
+      // Playback speed selector
+      const rateRow = document.createElement('div');
+      rateRow.className = 'a11y-row';
+      const rateLabel = document.createElement('label');
+      rateLabel.textContent = 'Velocidad de lectura';
+      rateLabel.style.display = 'block';
+      const rateSelect = document.createElement('select');
+      rateSelect.setAttribute('aria-label', 'Seleccionar velocidad de lectura');
+      rateSelect.id = 'a11y-rate';
+      rateLabel.setAttribute('for', 'a11y-rate');
+      rateSelect.style.minWidth = '220px';
+      rateSelect.style.maxWidth = '100%';
+      ;[
+        { v: 1, t: '1x (normal)' },
+        { v: 2, t: '2x' },
+        { v: 4, t: '4x' },
+      ].forEach(({ v, t }) => {
+        const opt = document.createElement('option');
+        opt.value = String(v);
+        opt.textContent = t;
+        rateSelect.appendChild(opt);
+      });
+      try { rateSelect.value = String((window.ccgTTS && window.ccgTTS.getRate) ? window.ccgTTS.getRate() : 1); } catch (_) {}
+      rateSelect.addEventListener('change', () => {
+        const r = parseFloat(rateSelect.value) || 1;
+        if (window.ccgTTS && window.ccgTTS.setRate) window.ccgTTS.setRate(r);
+      });
+      rateRow.appendChild(rateLabel);
+      rateRow.appendChild(rateSelect);
+      panel.appendChild(rateRow);
+
+      // Populate voice options with Spanish variants, default to Spanish (US)
       (function setupVoiceSelect() {
+        // Guard: Web Speech API availability
         if (typeof window.speechSynthesis === 'undefined') {
           voiceSelect.disabled = true;
           const opt = document.createElement('option');
@@ -963,49 +1085,48 @@
           return;
         }
         const synth = window.speechSynthesis;
-        const preferredName = (window.ccgTTS && window.ccgTTS.getPreferredVoiceName) ? window.ccgTTS.getPreferredVoiceName() : '';
+        const brandRank = (n) => (/Google|Microsoft|Apple/i.test(n) ? 0 : 1);
         const populate = () => {
           const list = synth.getVoices();
-          if (!list || list.length === 0) return false;
-          // Build options: prefer Spanish voices on top
-          const isSpanish = (v) => /(^es\b)|(^es[-_])/i.test(v.lang) || /spanish|español|mexico|méxico|mx/i.test((v.name||''));
-          const sorted = list.slice().sort((a, b) => {
-            const aEs = isSpanish(a) ? 0 : 1;
-            const bEs = isSpanish(b) ? 0 : 1;
-            const n1 = (a.name||'').toLowerCase();
-            const n2 = (b.name||'').toLowerCase();
-            if (aEs !== bEs) return aEs - bEs;
-            return n1.localeCompare(n2);
-          });
           voiceSelect.innerHTML = '';
-          sorted.forEach((v) => {
+          const filtered = list.filter((v) => (v.lang || '').toLowerCase().startsWith('es')).sort((a,b) => {
+            // es-US preferred by name/lang match
+            const aUS = /(es[-_]?us)/i.test(a.lang) || /\bUS\b|Estados Unidos|United States/i.test(a.name);
+            const bUS = /(es[-_]?us)/i.test(b.lang) || /\bUS\b|Estados Unidos|United States/i.test(b.name);
+            if (aUS !== bUS) return aUS ? -1 : 1;
+            const br = brandRank(a.name) - brandRank(b.name);
+            if (br !== 0) return br;
+            return (a.name||'').localeCompare(b.name||'');
+          });
+          if (!filtered.length) {
+            voiceSelect.disabled = true;
+            const opt = document.createElement('option');
+            opt.textContent = 'Voces (ES) no disponibles';
+            voiceSelect.appendChild(opt);
+            return false;
+          }
+          voiceSelect.disabled = false;
+          filtered.forEach((v) => {
             const opt = document.createElement('option');
             opt.value = v.name;
-            opt.textContent = `${v.name} (${v.lang})`;
+            opt.textContent = `${v.name} (${v.lang || 'es'})`;
             voiceSelect.appendChild(opt);
           });
-          // Select preferred if available; otherwise pick a Spanish voice
-          const pickSpanish = sorted.find((v) => isSpanish(v));
-          const target = preferredName && sorted.find((v) => v.name === preferredName) || pickSpanish || sorted[0];
-          if (target) voiceSelect.value = target.name;
+          // Force fixed voice: first option after sorting (es-US if available)
+          if (voiceSelect.options.length) voiceSelect.selectedIndex = 0;
+          // Lock the selector
+          voiceSelect.disabled = true;
           return true;
         };
         const ok = populate();
         if (!ok) {
-          // Some engines load voices asynchronously
-          const retry = () => { if (populate()) { synth.removeEventListener('voiceschanged', retry); } };
+          const retry = () => { synth.removeEventListener('voiceschanged', retry); populate(); };
           synth.addEventListener('voiceschanged', retry);
           setTimeout(populate, 300);
           setTimeout(populate, 1200);
         }
-        voiceSelect.addEventListener('change', () => {
-          const name = voiceSelect.value || '';
-          if (window.ccgTTS && window.ccgTTS.setPreferredVoice) {
-            window.ccgTTS.setPreferredVoice(name);
-          }
-        });
+        // No change handler: voice fixed
       })();
-
       // Preferences toggles
       const list = document.createElement('ul');
       list.className = 'a11y-list';
@@ -1015,14 +1136,15 @@
         li.className = 'a11y-item';
         const id = `a11y-${key}`;
         const label = document.createElement('label');
-        label.setAttribute('for', id);
         label.textContent = def.label;
+        label.setAttribute('for', id); // Associate label with input for better accessibility
         const input = document.createElement('input');
         input.type = 'checkbox';
         input.id = id;
         input.checked = !!state[key];
         input.addEventListener('change', () => {
           state[key] = !!input.checked;
+          if (key === 'contrast') state._contrastManual = true; // remember manual override
           save(state);
           apply();
         });
@@ -1033,25 +1155,53 @@
 
       Object.entries(PREFS).forEach(([key, def]) => list.appendChild(makeRow(key, def)));
       panel.appendChild(list);
-      panel.appendChild(close);
+
+      // Add a small reset control to clear manual override for contrast and resync with system
+      // Removed per request
 
       document.body.appendChild(btn);
       document.body.appendChild(panel);
 
+      // Live-sync with system preference while no manual override
+      try {
+        if (window.matchMedia) {
+          const mq1 = window.matchMedia('(prefers-contrast: more)');
+          const mq2 = window.matchMedia('(forced-colors: active)');
+          const onSysChange = () => {
+            if (state._contrastManual) return; // user decided; don't override
+            const shouldOn = mq1.matches || mq2.matches;
+            if (state.contrast !== shouldOn) {
+              state.contrast = shouldOn;
+              save(state);
+              apply();
+              const cb = document.getElementById('a11y-contrast');
+              if (cb) cb.checked = !!state.contrast;
+            }
+          };
+          mq1.addEventListener('change', onSysChange);
+          mq2.addEventListener('change', onSysChange);
+        }
+      } catch (_) {}
+
       const openPanel = () => {
         panel.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
         document.addEventListener('keydown', onKey);
+        // Move focus to first control
+        const first = panel.querySelector('input, select, button');
+        if (first) first.focus();
       };
       const closePanel = () => {
         panel.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
         document.removeEventListener('keydown', onKey);
+        btn.focus();
       };
       const onKey = (e) => { if (e.key === 'Escape') closePanel(); };
 
       btn.addEventListener('click', () => {
         if (panel.hidden) openPanel(); else closePanel();
       });
-      close.addEventListener('click', closePanel);
     })();
 
     // Contact form: accessible validation and announcements
